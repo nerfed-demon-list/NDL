@@ -1,12 +1,9 @@
 import { fetchLeaderboard } from '../content.js';
 import { localize } from '../util.js';
-
 import Spinner from '../components/Spinner.js';
 
 export default {
-    components: {
-        Spinner,
-    },
+    components: { Spinner },
     data: () => ({
         leaderboard: [],
         loading: true,
@@ -26,7 +23,7 @@ export default {
                 </div>
                 <div class="board-container">
                     <table class="board">
-                        <tr v-for="(ientry, i) in leaderboard">
+                        <tr v-for="(ientry, i) in leaderboard" :key="ientry.user">
                             <td class="rank">
                                 <p class="type-label-lg">#{{ i + 1 }}</p>
                             </td>
@@ -44,10 +41,10 @@ export default {
                 <div class="player-container">
                     <div class="player">
                         <h1>#{{ selected + 1 }} {{ entry.user }}</h1>
-                        <h3>{{ entry.total }}</h3>
+                        <h3>{{ localize(entry.total) }}</h3>
                         <h2 v-if="entry.verified.length > 0">Verified ({{ entry.verified.length}})</h2>
                         <table class="table">
-                            <tr v-for="score in entry.verified">
+                            <tr v-for="score in entry.verified" :key="score.level + '-verified'">
                                 <td class="rank">
                                     <p>#{{ score.rank }}</p>
                                 </td>
@@ -61,7 +58,7 @@ export default {
                         </table>
                         <h2 v-if="entry.completed.length > 0">Completed ({{ entry.completed.length }})</h2>
                         <table class="table">
-                            <tr v-for="score in entry.completed">
+                            <tr v-for="score in entry.completed" :key="score.level + '-completed'">
                                 <td class="rank">
                                     <p>#{{ score.rank }}</p>
                                 </td>
@@ -75,7 +72,7 @@ export default {
                         </table>
                         <h2 v-if="entry.progressed.length > 0">Progressed ({{entry.progressed.length}})</h2>
                         <table class="table">
-                            <tr v-for="score in entry.progressed">
+                            <tr v-for="score in entry.progressed" :key="score.level + '-progressed'">
                                 <td class="rank">
                                     <p>#{{ score.rank }}</p>
                                 </td>
@@ -94,14 +91,21 @@ export default {
     `,
     computed: {
         entry() {
-            return this.leaderboard[this.selected];
+            return (
+                this.leaderboard[this.selected] || {
+                    user: '',
+                    total: 0,
+                    verified: [],
+                    completed: [],
+                    progressed: [],
+                }
+            );
         },
     },
     async mounted() {
         const [leaderboard, err] = await fetchLeaderboard();
         this.leaderboard = leaderboard;
         this.err = err;
-        // Hide loading spinner
         this.loading = false;
     },
     methods: {
