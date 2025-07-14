@@ -34,10 +34,7 @@ export default {
             <template v-else>
                 <div class="type-title-sm">Creators</div>
                 <p class="type-body">
-                    <template v-for="(creator, index) in creators" :key="\`creator-\$\{creator\}\`">
-                        <span >{{ creator }}</span
-                        ><span v-if="index < creators.length - 1">, </span>
-                    </template>
+                    <span>{{ joinedCreators }}</span>
                 </p>
                 <div class="type-title-sm">Verifier</div>
                 <p class="type-body">
@@ -50,10 +47,13 @@ export default {
             </p>
         </div>
     `,
-
     computed: {
         selfVerified() {
             return this.author === this.verifier && this.creators.length === 0;
         },
+        joinedCreators() {
+            // Defensive: fallback to [] if undefined
+            return (this.creators || []).join(', ');
+        }
     },
 };
