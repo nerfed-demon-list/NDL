@@ -41,7 +41,7 @@ export default {
                 <div class="levels">
                     <template v-if="levels.length > 0">
                         <!-- Completed Levels -->
-                        <div class="level" v-for="(level, i) in levels.slice(0, progression.length)">
+                        <div class="level" v-for="(level, i) in levels.slice(0, progression.length)" :key="'completed-' + (level.id || level.name) + '-' + i">
                             <a :href="level.video" class="video">
                                 <img :src="getThumbnailFromId(getYoutubeIdFromUrl(level.video))" alt="">
                             </a>
@@ -52,7 +52,7 @@ export default {
                             </div>
                         </div>
                         <!-- Current Level -->
-                        <div class="level" v-if="!hasCompleted">
+                        <div class="level" v-if="!hasCompleted && currentLevel" :key="'current-' + (currentLevel.id || currentLevel.name)">
                             <a :href="currentLevel.video" target="_blank" class="video">
                                 <img :src="getThumbnailFromId(getYoutubeIdFromUrl(currentLevel.video))" alt="">
                             </a>
@@ -62,7 +62,7 @@ export default {
                                 <p>{{ currentLevel.id }}</p>
                             </div>
                             <form class="actions" v-if="!givenUp">
-                                <input type="number" v-model="percentage" :placeholder="placeholder" :min="currentPercentage + 1" max=100>
+                                <input type="number" v-model.number="percentage" :placeholder="placeholder" :min="currentPercentage + 1" max="100">
                                 <Btn @click.native.prevent="onDone">Done</Btn>
                                 <Btn @click.native.prevent="onGiveUp" style="background-color: #e91e63;">Give Up</Btn>
                             </form>
@@ -76,7 +76,7 @@ export default {
                         </div>
                         <!-- Remaining Levels -->
                         <template v-if="givenUp && showRemaining">
-                            <div class="level" v-for="(level, i) in levels.slice(progression.length + 1, levels.length - currentPercentage + progression.length)">
+                            <div class="level" v-for="(level, i) in levels.slice(progression.length + 1, levels.length - currentPercentage + progression.length)" :key="'remaining-' + (level.id || level.name) + '-' + i">
                                 <a :href="level.video" target="_blank" class="video">
                                     <img :src="getThumbnailFromId(getYoutubeIdFromUrl(level.video))" alt="">
                                 </a>
@@ -92,7 +92,7 @@ export default {
             </section>
             <div class="toasts-container">
                 <div class="toasts">
-                    <div v-for="toast in toasts" class="toast">
+                    <div v-for="(toast, i) in toasts" class="toast" :key="i">
                         <p>{{ toast }}</p>
                     </div>
                 </div>
@@ -126,12 +126,14 @@ export default {
             return;
         }
 
-        this.levels = roulette.levels;
-        this.progression = roulette.progression;
+        if (Array.isArray(roulette.levels) && Array.isArray(roulette.progression)) {
+            this.levels = roulette.levels;
+            this.progression = roulette.progression;
+        }
     },
     computed: {
         currentLevel() {
-            return this.levels[this.progression.length];
+            return this.levels[this.progression.length] || null;
         },
         currentPercentage() {
             return this.progression[this.progression.length - 1] || 0;
@@ -141,8 +143,8 @@ export default {
         },
         hasCompleted() {
             return (
-                this.progression[this.progression.length - 1] >= 100 ||
-                this.progression.length === this.levels.length
+                (this.progression[this.progression.length - 1] >= 100) ||
+                (this.progression.length === this.levels.length)
             );
         },
         isActive() {
@@ -163,134 +165,5 @@ export default {
                 return;
             }
 
-            if (!this.useMainList && !this.useExtendedList) {
-                return;
-            }
-
-            this.loading = true;
-
-            const fullList = await fetchList();
-
-            if (fullList.filter(([_, err]) => err).length > 0) {
-                this.loading = false;
-                this.showToast(
-                    'List is currently broken. Wait until it\'s fixed to start a roulette.',
-                );
-                return;
-            }
-
-            const fullListMapped = fullList.map(([lvl, _], i) => ({
-                rank: i + 1,
-                id: lvl.id,
-                name: lvl.name,
-                video: lvl.verification,
-            }));
-            const list = [];
-            if (this.useMainList) list.push(...fullListMapped.slice(0, 75));
-            if (this.useExtendedList) {
-                list.push(...fullListMapped.slice(75, 150));
-            }
-
-            // random 100 levels
-            this.levels = shuffle(list).slice(0, 100);
-            this.showRemaining = false;
-            this.givenUp = false;
-            this.progression = [];
-            this.percentage = undefined;
-
-            this.loading = false;
-        },
-        save() {
-            localStorage.setItem(
-                'roulette',
-                JSON.stringify({
-                    levels: this.levels,
-                    progression: this.progression,
-                }),
-            );
-        },
-        onDone() {
-            if (!this.percentage) {
-                return;
-            }
-
-            if (
-                this.percentage <= this.currentPercentage ||
-                this.percentage > 100
-            ) {
-                this.showToast('Invalid percentage.');
-                return;
-            }
-
-            this.progression.push(this.percentage);
-            this.percentage = undefined;
-
-            this.save();
-        },
-        onGiveUp() {
-            this.givenUp = true;
-
-            // Save progress
-            localStorage.removeItem('roulette');
-        },
-        onImport() {
-            if (
-                this.isActive &&
-                !window.confirm('This will overwrite the currently running roulette. Continue?')
-            ) {
-                return;
-            }
-
-            this.fileInput.showPicker();
-        },
-        async onImportUpload() {
-            if (this.fileInput.files.length === 0) return;
-
-            const file = this.fileInput.files[0];
-
-            if (file.type !== 'application/json') {
-                this.showToast('Invalid file.');
-                return;
-            }
-
-            try {
-                const roulette = JSON.parse(await file.text());
-
-                if (!roulette.levels || !roulette.progression) {
-                    this.showToast('Invalid file.');
-                    return;
-                }
-
-                this.levels = roulette.levels;
-                this.progression = roulette.progression;
-                this.save();
-                this.givenUp = false;
-                this.showRemaining = false;
-                this.percentage = undefined;
-            } catch {
-                this.showToast('Invalid file.');
-                return;
-            }
-        },
-        onExport() {
-            const file = new Blob(
-                [JSON.stringify({
-                    levels: this.levels,
-                    progression: this.progression,
-                })],
-                { type: 'application/json' },
-            );
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(file);
-            a.download = 'tsl_roulette';
-            a.click();
-            URL.revokeObjectURL(a.href);
-        },
-        showToast(msg) {
-            this.toasts.push(msg);
-            setTimeout(() => {
-                this.toasts.shift();
-            }, 3000);
-        },
-    },
-};
+            if (!this
+
